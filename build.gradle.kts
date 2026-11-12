@@ -30,3 +30,12 @@ subprojects {
         }
     }
 }
+
+// Publicar no repositório remoto sem publishUrl deve parar com mensagem clara, em vez de não fazer nada.
+val remotePublishUrlPresent = !providers.gradleProperty("publishUrl").orNull.isNullOrBlank()
+gradle.taskGraph.whenReady {
+    val publishesRemotely = allTasks.any { it.name == "publish" || it.name.contains("PublicationToReleaseRepository") }
+    if (publishesRemotely && !remotePublishUrlPresent) {
+        throw GradleException("publishUrl não definida. Passe -PpublishUrl=<url>, -PpublishUser e -PpublishPassword pelo CI. Use publishToMavenLocal para testes locais.")
+    }
+}
