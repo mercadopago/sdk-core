@@ -1,0 +1,71 @@
+version: 2.1
+
+# Publicação só em tag vX.Y.Z. Commits em branch rodam os testes e não publicam.
+# O contexto "mp-sdk-core-publish" deve ter PUBLISH_URL, PUBLISH_USER e PUBLISH_PASSWORD (a definir com a plataforma).
+
+executors:
+  jvm-android:
+    docker:
+      - image: cimg/android:2025.01
+    working_directory: ~/repo
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError"
+  macos-xcode:
+    macos:
+      xcode: "16.2.0"
+    working_directory: ~/repo
+
+jobs:
+  test-jvm-android:
+    executor: jvm-android
+    steps:
+      - checkout
+      - run:
+          name: Testes JVM e Android unit
+          command: ./gradlew :core-common:jvmTest :network:jvmTest :core:jvmTest :core:testDebugUnitTest
+
+  test-ios:
+    executor: macos-xcode
+    steps:
+      - checkout
+      - run:
+          name: Testes iOS Simulator
+          command: ./gradlew :core:iosSimulatorArm64Test
+
+  publish:
+    executor: macos-xcode
+    steps:
+      - checkout
+      - run:
+          name: Versão a partir da tag
+          command: echo "export VERSION=${CIRCLE_TAG#v}" >> "$BASH_ENV"
+      - run:
+          name: XCFramework zip e SHA-256
+          command: ./gradlew :core:zipXCFramework :core:xcframeworkChecksum -Pversion=$VERSION
+      - store_artifacts:
+          path: core/build/distributions
+      - run:
+          name: Publicar no canal Maven
+          command: .circleci/scripts/publish-maven.sh
+
+workflows:
+  build-and-release:
+    jobs:
+      - test-jvm-android:
+          filters:
+            tags:
+              only: /^v.*/
+      - test-ios:
+          filters:
+            tags:
+              only: /^v.*/
+      - publish:
+          context: mp-sdk-core-publish
+          requires:
+            - test-jvm-android
+            - test-ios
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
