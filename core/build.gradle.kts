@@ -9,6 +9,30 @@ plugins {
     `maven-publish`
 }
 
+// Gera a constante CORE_VERSION com a versão do projeto, enviada no header SDK-version.
+val generateCoreVersion by tasks.registering {
+    val coreVersion = project.version.toString()
+    val outputDirectory = layout.buildDirectory.dir("generated/coreVersion/commonMain/kotlin")
+    inputs.property("coreVersion", coreVersion)
+    outputs.dir(outputDirectory)
+    doLast {
+        val escapedCoreVersion = coreVersion
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("$", "\\$")
+        val file = outputDirectory.get().file("com/mercadopago/sdk/core/CoreVersion.kt").asFile
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            |package com.mercadopago.sdk.core
+            |
+            |internal const val CORE_VERSION: String = "$escapedCoreVersion"
+            |
+            """.trimMargin(),
+        )
+    }
+}
+
 kotlin {
     explicitApi()
 
@@ -41,14 +65,18 @@ kotlin {
         all {
             languageSettings.optIn("com.mercadopago.sdk.common.InternalMercadoPagoApi")
         }
+        commonMain {
+            kotlin.srcDir(generateCoreVersion)
+        }
         commonMain.dependencies {
             api(project(":core-common"))
             implementation(project(":network"))
+            // JsonObject do device no corpo de card_tokens.
+            implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
-            implementation(libs.kotlinx.serialization.json)
         }
     }
 }
@@ -65,6 +93,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+}
+
+// O teste JVM confere que CORE_VERSION é a versão do build.
+tasks.named<Test>("jvmTest") {
+    systemProperty("mercadopago.core.version", project.version.toString())
 }
 
 // XCFramework compactado para release no iOS.
