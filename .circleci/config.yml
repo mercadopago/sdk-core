@@ -38,10 +38,15 @@ jobs:
       - checkout
       - run:
           name: Versão a partir da tag
-          command: echo "export VERSION=${CIRCLE_TAG#v}" >> "$BASH_ENV"
+          command: |
+            if [[ ! "$CIRCLE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Tag inválida: use o formato vX.Y.Z"
+              exit 1
+            fi
+            echo "export VERSION=${CIRCLE_TAG#v}" >> "$BASH_ENV"
       - run:
           name: XCFramework zip e SHA-256
-          command: ./gradlew :core:zipXCFramework :core:xcframeworkChecksum -Pversion=$VERSION
+          command: ./gradlew :core:zipXCFramework :core:xcframeworkChecksum -Pversion="$VERSION"
       - store_artifacts:
           path: core/build/distributions
       - run:
@@ -54,11 +59,11 @@ workflows:
       - test-jvm-android:
           filters:
             tags:
-              only: /^v.*/
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
       - test-ios:
           filters:
             tags:
-              only: /^v.*/
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
       - publish:
           context: mp-sdk-core-publish
           requires:
@@ -66,6 +71,6 @@ workflows:
             - test-ios
           filters:
             tags:
-              only: /^v.*/
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
             branches:
               ignore: /.*/

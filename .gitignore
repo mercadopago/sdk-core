@@ -6,3 +6,6 @@ local.properties
 .kotlin/
 .DS_Store
 .claude/settings.local.json
+
+# Logs locais de build
+*.log

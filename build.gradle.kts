@@ -7,9 +7,11 @@ plugins {
     alias(libs.plugins.android.library) apply false
 }
 
+val projectVersion = providers.gradleProperty("version").getOrElse("0.0.0-SNAPSHOT")
+
 subprojects {
     group = "com.mercadopago.sdk"
-    version = providers.gradleProperty("version").getOrElse("0.0.0-SNAPSHOT")
+    version = projectVersion
 
     // Repositório de publicação: URL e credenciais vêm de propriedades do Gradle (CI), nunca do código.
     pluginManager.withPlugin("maven-publish") {
@@ -37,5 +39,9 @@ gradle.taskGraph.whenReady {
     val publishesRemotely = allTasks.any { it.name == "publish" || it.name.contains("PublicationToReleaseRepository") }
     if (publishesRemotely && !remotePublishUrlPresent) {
         throw GradleException("publishUrl não definida. Passe -PpublishUrl=<url>, -PpublishUser e -PpublishPassword pelo CI. Use publishToMavenLocal para testes locais.")
+    }
+    // A versão SNAPSHOT iria no header SDK-version do tráfego real. Publicar exige -Pversion do CI.
+    if (publishesRemotely && projectVersion.endsWith("-SNAPSHOT")) {
+        throw GradleException("Versão SNAPSHOT não pode ser publicada no repositório remoto. Passe -Pversion=<versão> pelo CI. Use publishToMavenLocal para testes locais.")
     }
 }
